@@ -1,9 +1,17 @@
-use tiny_http::{Server, Method, Response, StatusCode};
+use tiny_http::{Header, Method, Response, Server, StatusCode};
 use chrono::Local;
 use std::{sync::Arc, sync::atomic::{AtomicBool, Ordering}};
 
 fn log(msg: &str) {
     println!("[{}] {}", Local::now().format("%Y-%m-%d %H:%M:%S"), msg);
+}
+
+fn cors_headers() -> Vec<Header> {
+    vec![
+        Header::from_bytes("Access-Control-Allow-Origin", "*").unwrap(),
+        Header::from_bytes("Access-Control-Allow-Methods", "HEAD, OPTIONS").unwrap(),
+        Header::from_bytes("Access-Control-Allow-Headers", "*").unwrap(),
+    ]
 }
 
 fn main() {
@@ -28,21 +36,39 @@ fn main() {
             break;
         }
 
-        if req.method() != &Method::Head {
-            log(&format!("{} {} -> 405", req.method(), req.url()));
-            let _ = req.respond(Response::empty(StatusCode(405)));
-            continue;
+
+        match *req.method() {
+            Method::Head => {
+                let path = req.url();
+                let status = if std::fs::metadata(path).is_ok() {
+                    StatusCode(200)
+                } else {
+                    StatusCode(404)
+                };
+                log(&format!("HEAD {} -> {}", path, status.0));
+                let mut res = Response::empty(status);
+                for h in cors_headers() {
+                    res.add_header(h);
+                }
+                let _ = req.respond(res);
+            }
+            Method::Options => {
+                log(&format!("OPTIONS {} -> 204", req.url()));
+                let mut res = Response::empty(StatusCode(204));
+                for h in cors_headers() {
+                    res.add_header(h);
+                }
+                let _ = req.respond(res);
+            }
+            _ => {
+                log(&format!("{} {} -> 405", req.method(), req.url()));
+                let mut res = Response::empty(StatusCode(405));
+                for h in cors_headers() {
+                    res.add_header(h);
+                }
+                let _ = req.respond(res);
+            }
         }
-
-        let path = req.url();
-        let status = if std::fs::metadata(path).is_ok() {
-            StatusCode(200)
-        } else {
-            StatusCode(404)
-        };
-
-        log(&format!("HEAD {} -> {}", path, status.0));
-        let _ = req.respond(Response::empty(status));
     }
 
     log("Server closed.");
