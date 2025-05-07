@@ -1,6 +1,7 @@
 use tiny_http::{Header, Method, Response, Server, StatusCode};
 use chrono::Local;
 use std::{sync::Arc, sync::atomic::{AtomicBool, Ordering}};
+use percent_encoding::percent_decode_str;
 
 fn log(msg: &str) {
     println!("[{}] {}", Local::now().format("%Y-%m-%d %H:%M:%S"), msg);
@@ -39,8 +40,10 @@ fn main() {
 
         match *req.method() {
             Method::Head => {
-                let path = req.url();
-                let status = if std::fs::metadata(path).is_ok() {
+                let raw_path = req.url();
+                let path = percent_decode_str(raw_path)
+                    .decode_utf8_lossy();
+                let status = if std::fs::metadata(&*path).is_ok() {
                     StatusCode(200)
                 } else {
                     StatusCode(404)
