@@ -1,0 +1,9 @@
+[package]
+name = "file-exists-http-api"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.41"
+ctrlc = "3.4.6"
+tiny_http = "0.12"
